@@ -3,37 +3,43 @@ import { User, Company, Job, Application, Interview, Notification, Conversation 
 export const mockUsers: User[] = [
   {
     id: 'u1', name: 'Alex Johnson', email: 'alex@example.com', phone: '+1 555-0101',
-    role: 'seeker', status: 'Active', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Alex',
+    role: 'seeker', status: 'Active', approvalStatus: 'approved', rejectionReason: '',
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Alex',
     location: 'San Francisco, CA', title: 'Frontend Developer', about: 'Passionate developer with 3 years of experience.',
     skills: ['React', 'TypeScript', 'Node.js', 'Tailwind CSS'], registeredAt: '2024-01-15'
   },
   {
     id: 'u2', name: 'Sarah Miller', email: 'sarah@techcorp.com', phone: '+1 555-0102',
-    role: 'recruiter', status: 'Active', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah',
+    role: 'recruiter', status: 'Active', approvalStatus: 'approved', rejectionReason: '',
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah',
     location: 'New York, NY', title: 'Senior Recruiter', about: 'Connecting top talent with great companies.',
     skills: ['Recruiting', 'HR', 'Talent Acquisition'], registeredAt: '2024-01-10'
   },
   {
     id: 'u3', name: 'Admin User', email: 'admin@hireflow.com', phone: '+1 555-0100',
-    role: 'admin', status: 'Active', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Admin',
+    role: 'admin', status: 'Active', approvalStatus: 'approved', rejectionReason: '',
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Admin',
     location: 'Austin, TX', title: 'System Administrator', about: 'Managing the HireFlow platform.',
     skills: ['Administration', 'Management'], registeredAt: '2024-01-01'
   },
   {
     id: 'u4', name: 'James Wilson', email: 'james@example.com', phone: '+1 555-0103',
-    role: 'seeker', status: 'Active', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=James',
+    role: 'seeker', status: 'Active', approvalStatus: 'approved', rejectionReason: '',
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=James',
     location: 'Chicago, IL', title: 'UX Designer', about: 'Creative designer focused on user experience.',
     skills: ['Figma', 'UI/UX', 'Prototyping', 'Adobe XD'], registeredAt: '2024-02-01'
   },
   {
     id: 'u5', name: 'Emily Chen', email: 'emily@startup.io', phone: '+1 555-0104',
-    role: 'recruiter', status: 'Active', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Emily',
+    role: 'recruiter', status: 'Active', approvalStatus: 'approved', rejectionReason: '',
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Emily',
     location: 'Seattle, WA', title: 'HR Manager', about: 'Building great teams at fast-growing startups.',
     skills: ['Recruiting', 'Onboarding', 'Culture'], registeredAt: '2024-01-20'
   },
   {
     id: 'u6', name: 'Michael Brown', email: 'michael@example.com', phone: '+1 555-0105',
-    role: 'seeker', status: 'Pending', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Michael',
+    role: 'seeker', status: 'Pending', approvalStatus: 'pending', rejectionReason: '',
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Michael',
     location: 'Boston, MA', title: 'Data Scientist', about: 'ML enthusiast with a passion for data.',
     skills: ['Python', 'Machine Learning', 'SQL', 'TensorFlow'], registeredAt: '2024-03-01'
   },
@@ -41,42 +47,42 @@ export const mockUsers: User[] = [
 
 export const mockCompanies: Company[] = [
   {
-    id: 'c1', name: 'TechCorp Inc.', logo: '🏢', industry: 'Technology',
+    id: 'c1', name: 'TechCorp Inc.', logo: '/web.jpg', industry: 'Technology',
     location: 'San Francisco, CA', size: '1000-5000', website: 'techcorp.com',
     description: 'Leading technology company building the future of software.',
     benefits: ['Health Insurance', 'Remote Work', '401k', 'Stock Options', 'Unlimited PTO'],
     jobCount: 12, founded: '2010'
   },
   {
-    id: 'c2', name: 'StartupIO', logo: '🚀', industry: 'SaaS',
+    id: 'c2', name: 'StartupIO', logo: '/.mark.jpg', industry: 'SaaS',
     location: 'New York, NY', size: '50-200', website: 'startup.io',
     description: 'Fast-growing SaaS startup disrupting the enterprise market.',
     benefits: ['Equity', 'Flexible Hours', 'Learning Budget', 'Health Insurance'],
     jobCount: 8, founded: '2019'
   },
   {
-    id: 'c3', name: 'DesignHub', logo: '🎨', industry: 'Design',
+    id: 'c3', name: 'DesignHub', logo: '/ui.jpg', industry: 'Design',
     location: 'Austin, TX', size: '200-500', website: 'designhub.co',
     description: 'Creative agency delivering world-class design solutions.',
     benefits: ['Creative Environment', 'Remote Work', 'Health Insurance', 'Gym Membership'],
     jobCount: 5, founded: '2015'
   },
   {
-    id: 'c4', name: 'DataFlow Analytics', logo: '📊', industry: 'Data & Analytics',
+    id: 'c4', name: 'DataFlow Analytics', logo: '/product.jpg', industry: 'Data & Analytics',
     location: 'Seattle, WA', size: '500-1000', website: 'dataflow.ai',
     description: 'Data-driven company helping businesses make smarter decisions.',
     benefits: ['Competitive Salary', 'Remote Work', 'Conference Budget', 'Health Insurance'],
     jobCount: 7, founded: '2016'
   },
   {
-    id: 'c5', name: 'CloudBase Systems', logo: '☁️', industry: 'Cloud Computing',
+    id: 'c5', name: 'CloudBase Systems', logo: '/devops.jpg', industry: 'Cloud Computing',
     location: 'Chicago, IL', size: '1000-5000', website: 'cloudbase.io',
     description: 'Enterprise cloud infrastructure for modern businesses.',
     benefits: ['Stock Options', 'Health Insurance', '401k', 'Remote Work'],
     jobCount: 15, founded: '2012'
   },
   {
-    id: 'c6', name: 'GreenTech Solutions', logo: '🌱', industry: 'CleanTech',
+    id: 'c6', name: 'GreenTech Solutions', logo: '/sus.jpg', industry: 'CleanTech',
     location: 'Denver, CO', size: '100-500', website: 'greentech.com',
     description: 'Building sustainable technology for a better planet.',
     benefits: ['Mission-driven', 'Health Insurance', 'Flexible Hours', 'Remote Work'],
@@ -159,7 +165,7 @@ export const mockJobs: Job[] = [
   },
   {
     id: 'j7', title: 'Marketing Manager', companyId: 'c2', company: 'StartupIO',
-    companyLogo: '🚀', location: 'New York, NY', salary: '$85k - $115k',
+    companyLogo: '/.mark.jpg', location: 'New York, NY', salary: '$85k - $115k',
     type: 'Full-time', workplaceType: 'Hybrid', experience: '4+ years', category: 'Marketing',
     description: 'Lead our marketing efforts and drive growth for our SaaS platform.',
     responsibilities: ['Develop marketing strategy', 'Manage campaigns', 'Content creation', 'Analytics and reporting'],
@@ -171,7 +177,7 @@ export const mockJobs: Job[] = [
   },
   {
     id: 'j8', title: 'Sustainability Engineer', companyId: 'c6', company: 'GreenTech Solutions',
-    companyLogo: '🌱', location: 'Denver, CO', salary: '$90k - $120k',
+    companyLogo: '/hh.jpg', location: 'Denver, CO', salary: '$90k - $120k',
     type: 'Full-time', workplaceType: 'On-site', experience: '2+ years', category: 'Engineering',
     description: 'Help us build sustainable technology solutions for a greener future.',
     responsibilities: ['Design sustainable systems', 'Energy efficiency analysis', 'Green tech implementation', 'Research and development'],

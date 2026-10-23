@@ -30,6 +30,9 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
+# Local HireFlow demo database (generated on first run)
+/data/*.json
+
 # env files (can opt-in for committing if needed)
 .env*
 

@@ -1,10 +1,11 @@
 export type UserRole = 'seeker' | 'recruiter' | 'admin';
-export type AppStatus = 'Applied' | 'Under Review' | 'Shortlisted' | 'Interview' | 'Accepted' | 'Rejected';
+export type AppStatus = 'Applied' | 'Under Review' | 'Shortlisted' | 'Interview' | 'Interview Scheduled' | 'Interviewed' | 'Accepted' | 'Rejected';
 export type JobStatus = 'Draft' | 'Active' | 'Paused' | 'Closed';
 export type JobType = 'Full-time' | 'Part-time' | 'Contract' | 'Internship' | 'Freelance';
 export type WorkplaceType = 'On-site' | 'Remote' | 'Hybrid';
 export type InterviewStatus = 'Scheduled' | 'Completed' | 'Cancelled' | 'Rescheduled';
 export type UserStatus = 'Pending' | 'Active' | 'Suspended';
+export type ApprovalStatus = 'pending' | 'approved' | 'rejected';
 
 export interface User {
   id: string;
@@ -13,11 +14,14 @@ export interface User {
   phone: string;
   role: UserRole;
   status: UserStatus;
+  approvalStatus: ApprovalStatus;
+  rejectionReason: string;
   avatar: string;
   location: string;
   title: string;
   about: string;
   skills: string[];
+  resumeUrl?: string;
   registeredAt: string;
 }
 
@@ -33,6 +37,7 @@ export interface Company {
   benefits: string[];
   jobCount: number;
   founded: string;
+  recruiterId?: string;
 }
 
 export interface Job {
@@ -70,6 +75,7 @@ export interface Application {
   seekerId: string;
   seekerName: string;
   seekerEmail: string;
+  seekerResumeUrl?: string;
   appliedAt: string;
   updatedAt: string;
   status: AppStatus;

@@ -1,20 +1,23 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+HireFlow is a standalone Next.js demo app that uses local sample data for its authentication and recruitment workflows.
 
-## Getting Started
-
-First, run the development server:
+## Local Development
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
+
+The local Next.js API stores demo changes in `data/hireflow.json`. The initial data is loaded from `lib/mockData.ts`; resume uploads are stored under `public/uploads/resumes/`.
+
+For demo sign-in, use an existing sample account such as `alex@example.com` (job seeker), `sarah@techcorp.com` (recruiter), or `admin@hireflow.com` (admin). The seeded password is `Password123!`.
+
+## Recruitment workflow
+
+- Applicants manage their profile, browse open positions, submit applications, track recruiter status changes, and withdraw applications.
+- Recruiters review their applications, update application status, and schedule interviews. Interview times and meeting details are shared with the applicant; marking an interview complete updates the displayed application progress.
+- Admins review platform users, update account status, monitor job posts, and access the full applications list.
+- Dashboards and workflow pages use the app's local API and demo data; no external API service is required.
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 

@@ -25,7 +25,9 @@ export default function JobCard({ job, saved = false, onSave }: JobCardProps) {
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center text-2xl flex-shrink-0">
-            {job.companyLogo}
+            {job.companyLogo?.startsWith('/') || job.companyLogo?.startsWith('http')
+              ? <img src={job.companyLogo} alt={job.company} className="w-full h-full object-cover rounded-xl" />
+              : job.companyLogo}
           </div>
           <div>
             <Link href={`/jobs/${job.id}`} className="font-semibold text-gray-900 hover:text-blue-600 transition-colors group-hover:text-blue-600">

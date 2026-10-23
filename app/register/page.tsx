@@ -2,25 +2,32 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Eye, EyeOff, User, Mail, Phone, Lock, AlertCircle, Briefcase, Search } from 'lucide-react';
+import { Eye, EyeOff, User, Mail, Phone, Lock, AlertCircle } from 'lucide-react';
+import { register } from '@/lib/auth';
+
+type FormValues = {
+  name: string; email: string; phone: string; password: string; confirm: string;
+};
 
 export default function RegisterPage() {
   const router = useRouter();
-  const [role, setRole] = useState<'seeker' | 'recruiter'>('seeker');
-  const [form, setForm] = useState({ name: '', email: '', phone: '', password: '', confirm: '' });
+  const [form, setForm]         = useState<FormValues>({ name: '', email: '', phone: '', password: '', confirm: '' });
   const [showPass, setShowPass] = useState(false);
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [loading, setLoading] = useState(false);
+  const [errors, setErrors]     = useState<Record<string, string>>({});
+  const [loading, setLoading]   = useState(false);
 
-  const validate = () => {
+  const set = (field: keyof FormValues) => (val: string) =>
+    setForm(prev => ({ ...prev, [field]: val }));
+
+  const validate = (): Record<string, string> => {
     const e: Record<string, string> = {};
-    if (!form.name.trim()) e.name = 'Full name is required';
-    if (!form.email) e.email = 'Email is required';
-    else if (!/\S+@\S+\.\S+/.test(form.email)) e.email = 'Invalid email address';
-    if (!form.phone) e.phone = 'Phone number is required';
-    if (!form.password) e.password = 'Password is required';
-    else if (form.password.length < 8) e.password = 'Password must be at least 8 characters';
-    if (form.password !== form.confirm) e.confirm = 'Passwords do not match';
+    if (!form.name.trim())                       e.name     = 'Full name is required.';
+    if (!form.email)                             e.email    = 'Email is required.';
+    else if (!/\S+@\S+\.\S+/.test(form.email))  e.email    = 'Invalid email address.';
+    if (!form.phone)                             e.phone    = 'Phone number is required.';
+    if (!form.password)                          e.password = 'Password is required.';
+    else if (form.password.length < 8)           e.password = 'Minimum 8 characters.';
+    if (form.password !== form.confirm)          e.confirm  = 'Passwords do not match.';
     return e;
   };
 
@@ -29,30 +36,44 @@ export default function RegisterPage() {
     const errs = validate();
     if (Object.keys(errs).length) { setErrors(errs); return; }
     setLoading(true);
-    await new Promise(r => setTimeout(r, 1200));
-    router.push(role === 'recruiter' ? '/dashboard/recruiter' : '/dashboard/seeker');
+    setErrors({});
+    try {
+      await register({ ...form, role: 'seeker' });
+
+      // Send OTP to their email
+      const otpRes = await fetch('/api/auth/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: form.email }),
+      });
+      const otpData = await otpRes.json().catch(() => ({})) as { error?: string };
+      if (!otpRes.ok) {
+        throw { detail: otpData.error ?? `Failed to send OTP (status ${otpRes.status}).` };
+      }
+
+      // Redirect to OTP verification page
+      router.push(`/verify-otp?email=${encodeURIComponent(form.email)}`);
+    } catch (err: unknown) {
+      const detail = err instanceof Error
+        ? err.message
+        : typeof err === 'object' && err !== null && 'detail' in err
+          ? String(err.detail)
+          : 'Registration failed. Please try again.';
+      setErrors({ general: detail });
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const Field = ({ name, label, type = 'text', icon: Icon, placeholder }: any) => (
-    <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1.5">{label}</label>
-      <div className="relative">
-        <Icon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-        <input type={type} value={form[name as keyof typeof form]} onChange={e => setForm({ ...form, [name]: e.target.value })}
-          placeholder={placeholder}
-          className={`w-full pl-10 pr-4 py-3 border rounded-xl outline-none transition-colors ${errors[name] ? 'border-red-400 bg-red-50' : 'border-gray-300 focus:border-blue-500'}`} />
-      </div>
-      {errors[name] && <p className="mt-1.5 text-sm text-red-600 flex items-center gap-1"><AlertCircle className="w-4 h-4" />{errors[name]}</p>}
-    </div>
-  );
-
+  // ── Register form ─────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4 py-10">
       <div className="w-full max-w-md">
+
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-2 mb-6">
             <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center">
-              <span className="text-white font-bold">H</span>
+              <span className="text-white font-bold text-lg">H</span>
             </div>
             <span className="text-2xl font-bold text-gray-900">HireFlow</span>
           </Link>
@@ -61,54 +82,46 @@ export default function RegisterPage() {
         </div>
 
         <div className="bg-white rounded-2xl shadow-xl p-8">
-          {/* Role selector */}
-          <div className="grid grid-cols-2 gap-3 mb-6">
-            {([
-              { value: 'seeker', label: 'Job Seeker', icon: Search, desc: 'Find your dream job' },
-              { value: 'recruiter', label: 'Recruiter', icon: Briefcase, desc: 'Hire top talent' },
-            ] as const).map(r => (
-              <button key={r.value} type="button" onClick={() => setRole(r.value)}
-                className={`p-4 rounded-xl border-2 text-left transition-all ${role === r.value ? 'border-blue-600 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}>
-                <r.icon className={`w-5 h-5 mb-2 ${role === r.value ? 'text-blue-600' : 'text-gray-400'}`} />
-                <div className={`font-semibold text-sm ${role === r.value ? 'text-blue-600' : 'text-gray-700'}`}>{r.label}</div>
-                <div className="text-xs text-gray-500">{r.desc}</div>
-              </button>
-            ))}
-          </div>
-
           <form onSubmit={handleSubmit} className="space-y-4">
-            <Field name="name" label="Full Name" icon={User} placeholder="John Doe" />
-            <Field name="email" label="Email Address" type="email" icon={Mail} placeholder="you@example.com" />
-            <Field name="phone" label="Phone Number" icon={Phone} placeholder="+1 555-0100" />
+            {errors.general && (
+              <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600">
+                <AlertCircle className="w-4 h-4 flex-shrink-0" /> {errors.general}
+              </div>
+            )}
+
+            <FormField label="Full Name" icon={User} placeholder="John Doe"
+              value={form.name} onChange={set('name')} error={errors.name} />
+            <FormField label="Email Address" type="email" icon={Mail} placeholder="you@example.com"
+              value={form.email} onChange={set('email')} error={errors.email} />
+            <FormField label="Phone Number" icon={Phone} placeholder="+1 555-0100"
+              value={form.phone} onChange={set('phone')} error={errors.phone} />
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Password</label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input type={showPass ? 'text' : 'password'} value={form.password} onChange={e => setForm({ ...form, password: e.target.value })}
+                <input type={showPass ? 'text' : 'password'} value={form.password}
+                  onChange={e => set('password')(e.target.value)}
                   placeholder="Min. 8 characters"
-                  className={`w-full pl-10 pr-12 py-3 border rounded-xl outline-none transition-colors ${errors.password ? 'border-red-400 bg-red-50' : 'border-gray-300 focus:border-blue-500'}`} />
-                <button type="button" onClick={() => setShowPass(!showPass)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
+                  className={`w-full pl-10 pr-12 py-3 border rounded-xl outline-none transition-colors ${
+                    errors.password ? 'border-red-400 bg-red-50' : 'border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100'
+                  }`} />
+                <button type="button" onClick={() => setShowPass(!showPass)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                   {showPass ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
-              {errors.password && <p className="mt-1.5 text-sm text-red-600 flex items-center gap-1"><AlertCircle className="w-4 h-4" />{errors.password}</p>}
+              {errors.password && <FieldError msg={errors.password} />}
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Confirm Password</label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input type="password" value={form.confirm} onChange={e => setForm({ ...form, confirm: e.target.value })}
-                  placeholder="Repeat your password"
-                  className={`w-full pl-10 pr-4 py-3 border rounded-xl outline-none transition-colors ${errors.confirm ? 'border-red-400 bg-red-50' : 'border-gray-300 focus:border-blue-500'}`} />
-              </div>
-              {errors.confirm && <p className="mt-1.5 text-sm text-red-600 flex items-center gap-1"><AlertCircle className="w-4 h-4" />{errors.confirm}</p>}
-            </div>
+            <FormField label="Confirm Password" type="password" icon={Lock}
+              placeholder="Repeat your password"
+              value={form.confirm} onChange={set('confirm')} error={errors.confirm} />
 
             <button type="submit" disabled={loading}
-              className="w-full py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 disabled:opacity-60 transition-colors mt-2">
-              {loading ? 'Creating account...' : 'Create Account'}
+              className="w-full py-3 bg-blue-600 text-white font-semibold rounded-xl
+                         hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors mt-2">
+              {loading ? 'Creating account…' : 'Create Account'}
             </button>
           </form>
 
@@ -118,6 +131,36 @@ export default function RegisterPage() {
           </p>
         </div>
       </div>
+    </div>
+  );
+}
+
+function FieldError({ msg }: { msg: string }) {
+  return (
+    <p className="mt-1.5 text-sm text-red-600 flex items-center gap-1">
+      <AlertCircle className="w-4 h-4" /> {msg}
+    </p>
+  );
+}
+
+function FormField({ label, type = 'text', icon: Icon, placeholder, value, onChange, error }: {
+  label: string; type?: string;
+  icon: React.ComponentType<{ className?: string }>;
+  placeholder: string; value: string;
+  onChange: (v: string) => void; error?: string;
+}) {
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1.5">{label}</label>
+      <div className="relative">
+        <Icon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+        <input type={type} value={value} onChange={e => onChange(e.target.value)}
+          placeholder={placeholder}
+          className={`w-full pl-10 pr-4 py-3 border rounded-xl outline-none transition-colors ${
+            error ? 'border-red-400 bg-red-50' : 'border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100'
+          }`} />
+      </div>
+      {error && <FieldError msg={error} />}
     </div>
   );
 }
