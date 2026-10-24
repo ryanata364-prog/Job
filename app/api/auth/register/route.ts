@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-server';
 
+export const dynamic = 'force-dynamic';
+
+
 const allowedRoles = new Set(['seeker', 'recruiter']);
 
 export async function POST(req: NextRequest) {
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY === 'your-service-role-key-here') {
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY === 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVkbnNheWxvcnFrbmJlZ21oaWxuIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MTg4MTgxNywiZXhwIjoyMTA3NDU3ODE3fQ.n4txNTA8XHX32M9jlOCf_03RBaOmMBIgFaTFxdaQWvk') {
     return NextResponse.json(
       { error: 'Server authentication is not configured. Add SUPABASE_SERVICE_ROLE_KEY to .env.local.' },
       { status: 500 },
@@ -62,3 +65,5 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid registration request.' }, { status: 400 });
   }
 }
+
+

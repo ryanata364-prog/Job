@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
 import { supabaseAdmin } from '@/lib/supabase-server';
+
+export const dynamic = 'force-dynamic';
+
 import crypto from 'crypto';
+
 
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST ?? 'smtp.gmail.com',
@@ -71,3 +75,5 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Internal server error.' }, { status: 500 });
   }
 }
+
+

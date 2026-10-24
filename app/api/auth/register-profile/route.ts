@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
     const anonKey      = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
     // Use service role if available, otherwise anon key
-    const key    = serviceKey && serviceKey !== 'your-service-role-key-here'
+    const key    = serviceKey && serviceKey !== 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVkbnNheWxvcnFrbmJlZ21oaWxuIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MTg4MTgxNywiZXhwIjoyMTA3NDU3ODE3fQ.n4txNTA8XHX32M9jlOCf_03RBaOmMBIgFaTFxdaQWvk'
       ? serviceKey
       : anonKey;
 
@@ -81,3 +81,5 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Internal server error.' }, { status: 500 });
   }
 }
+
+

@@ -7,7 +7,11 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-server';
+
+export const dynamic = 'force-dynamic';
+
 import crypto from 'crypto';
+
 
 const MAX_ATTEMPTS = 5;
 
@@ -95,3 +99,5 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Internal server error.' }, { status: 500 });
   }
 }
+
+
