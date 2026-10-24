@@ -1,85 +1,125 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCurrentUser } from '@/lib/server/auth';
-import { createId, readDatabase, updateDatabase } from '@/lib/server/database';
+import { createRouteClient } from '@/lib/server/supabaseServer';
+import { supabaseAdmin } from '@/lib/server/supabaseAdmin';
 import type { Job, JobStatus, JobType, WorkplaceType } from '@/lib/types';
 
 export const runtime = 'nodejs';
 
-function filterJobs(jobs: Job[], searchParams: URLSearchParams): Job[] {
-  const title = (searchParams.get('title') ?? searchParams.get('search') ?? '').toLowerCase();
-  const location = (searchParams.get('location') ?? '').toLowerCase();
-  const category = searchParams.get('category');
-  const type = searchParams.get('type');
-  const workplaceType = searchParams.get('workplaceType') ?? searchParams.get('workplace');
-  const companyId = searchParams.get('companyId');
-  const status = searchParams.get('status');
-
-  return jobs.filter((job) => {
-    const titleMatches = !title || [job.title, job.company, ...job.skills].some((value) => value.toLowerCase().includes(title));
-    return titleMatches
-      && (!location || job.location.toLowerCase().includes(location))
-      && (!category || job.category === category)
-      && (!type || job.type === type)
-      && (!workplaceType || job.workplaceType === workplaceType)
-      && (!companyId || job.companyId === companyId)
-      && (!status || job.status === status);
-  });
+function rowToJob(row: Record<string, unknown>): Job {
+  return {
+    id:               String(row.id ?? ''),
+    companyId:        String(row.company_id ?? ''),
+    company:          String(row.company ?? ''),
+    companyLogo:      String(row.company_logo ?? ''),
+    title:            String(row.title ?? ''),
+    location:         String(row.location ?? ''),
+    salary:           String(row.salary ?? ''),
+    type:             (row.type as JobType) ?? 'Full-time',
+    workplaceType:    (row.workplace_type as WorkplaceType) ?? 'On-site',
+    experience:       String(row.experience ?? ''),
+    category:         String(row.category ?? ''),
+    description:      String(row.description ?? ''),
+    responsibilities: Array.isArray(row.responsibilities) ? (row.responsibilities as string[]) : [],
+    requirements:     Array.isArray(row.requirements)     ? (row.requirements as string[])     : [],
+    qualifications:   Array.isArray(row.qualifications)   ? (row.qualifications as string[])   : [],
+    benefits:         Array.isArray(row.benefits)         ? (row.benefits as string[])         : [],
+    skills:           Array.isArray(row.skills)           ? (row.skills as string[])           : [],
+    vacancies:        Number(row.vacancies ?? 1),
+    deadline:         String(row.deadline ?? ''),
+    postedAt:         String(row.posted_at ?? row.postedAt ?? ''),
+    status:           (row.status as JobStatus) ?? 'Active',
+    views:            Number(row.views ?? 0),
+    applications:     Number(row.application_count ?? row.applications ?? 0),
+  };
 }
 
 export async function GET(request: NextRequest) {
-  const database = await readDatabase();
-  const requestedStatus = request.nextUrl.searchParams.get('status');
-  const jobs = filterJobs(database.jobs, request.nextUrl.searchParams)
-    .filter((job) => requestedStatus || job.status === 'Active')
-    .sort((a, b) => b.postedAt.localeCompare(a.postedAt));
-  return NextResponse.json(jobs);
+  const params = request.nextUrl.searchParams;
+  const search = (params.get('search') ?? params.get('title') ?? '').toLowerCase();
+  const location = params.get('location') ?? '';
+  const category = params.get('category') ?? '';
+  const type = params.get('type') ?? '';
+  const workplaceType = params.get('workplaceType') ?? params.get('workplace') ?? '';
+  const companyId = params.get('companyId') ?? '';
+  const statusFilter = params.get('status') ?? 'Active';
+
+  // Use admin client for public job listing (bypasses RLS for anonymous visitors)
+  let query = supabaseAdmin.from('jobs_with_company').select('*');
+
+  if (statusFilter) query = query.eq('status', statusFilter);
+  if (location)     query = query.ilike('location', `%${location}%`);
+  if (category)     query = query.eq('category', category);
+  if (type)         query = query.eq('type', type);
+  if (workplaceType) query = query.eq('workplace_type', workplaceType);
+  if (companyId)    query = query.eq('company_id', companyId);
+  if (search)       query = query.or(`title.ilike.%${search}%,company.ilike.%${search}%`);
+
+  const { data, error } = await query.order('posted_at', { ascending: false });
+
+  if (error) {
+    return NextResponse.json({ detail: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json((data ?? []).map(r => rowToJob(r as Record<string, unknown>)));
 }
 
-type JobInput = Partial<Job> & { companyId?: string };
-
 export async function POST(request: Request) {
-  const user = await getCurrentUser();
-  if (!user || (user.role !== 'recruiter' && user.role !== 'admin')) {
+  const supabase = await createRouteClient();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    return NextResponse.json({ detail: 'Authentication required.' }, { status: 401 });
+  }
+
+  const { data: profile } = await supabase
+    .from('profiles').select('role').eq('id', user.id).single();
+  if (profile?.role !== 'recruiter' && profile?.role !== 'admin') {
     return NextResponse.json({ detail: 'Only recruiters can post jobs.' }, { status: 403 });
   }
 
-  const body = (await request.json().catch(() => ({}))) as JobInput;
+  const body = (await request.json().catch(() => ({}))) as Partial<Job> & { companyId?: string };
   const title = body.title?.trim();
   const companyId = body.companyId;
-  if (!title || !companyId) return NextResponse.json({ detail: 'Title and company are required.' }, { status: 400 });
+  if (!title || !companyId) {
+    return NextResponse.json({ detail: 'Title and company are required.' }, { status: 400 });
+  }
 
-  const result = await updateDatabase((database) => {
-    const company = database.companies.find((item) => item.id === companyId);
-    if (!company) return null;
-    const job: Job = {
-      id: createId('j'),
+  const { data: company } = await supabase
+    .from('companies').select('id').eq('id', companyId).single();
+  if (!company) {
+    return NextResponse.json({ detail: 'Company not found.' }, { status: 404 });
+  }
+
+  const { data, error } = await supabase
+    .from('jobs')
+    .insert({
+      company_id:      companyId,
+      recruiter_id:    user.id,
       title,
-      companyId,
-      company: company.name,
-      companyLogo: company.logo,
-      location: body.location?.trim() || company.location,
-      salary: body.salary?.trim() || 'Competitive',
-      type: (body.type ?? 'Full-time') as JobType,
-      workplaceType: (body.workplaceType ?? 'Hybrid') as WorkplaceType,
-      experience: body.experience?.trim() || 'Not specified',
-      category: body.category?.trim() || 'General',
-      description: body.description?.trim() || '',
+      location:        body.location?.trim() ?? '',
+      salary:          body.salary?.trim() ?? 'Competitive',
+      type:            body.type ?? 'Full-time',
+      workplace_type:  body.workplaceType ?? 'Hybrid',
+      experience:      body.experience?.trim() ?? '',
+      category:        body.category?.trim() ?? 'General',
+      description:     body.description?.trim() ?? '',
       responsibilities: body.responsibilities ?? [],
-      requirements: body.requirements ?? [],
-      qualifications: body.qualifications ?? [],
-      benefits: body.benefits ?? [],
-      skills: body.skills ?? [],
-      vacancies: body.vacancies ?? 1,
-      deadline: body.deadline || '',
-      postedAt: new Date().toISOString().slice(0, 10),
-      status: (body.status ?? 'Active') as JobStatus,
-      views: 0,
-      applications: 0,
-    };
-    database.jobs.push(job);
-    return job;
-  });
+      requirements:    body.requirements ?? [],
+      qualifications:  body.qualifications ?? [],
+      benefits:        body.benefits ?? [],
+      skills:          body.skills ?? [],
+      vacancies:       body.vacancies ?? 1,
+      deadline:        body.deadline || null,
+      status:          body.status ?? 'Active',
+    })
+    .select(`*, companies(name, logo)`)
+    .single();
 
-  if (!result) return NextResponse.json({ detail: 'Company not found.' }, { status: 404 });
-  return NextResponse.json(result, { status: 201 });
+  if (error) {
+    return NextResponse.json({ detail: error.message }, { status: 500 });
+  }
+
+  const row = data as Record<string, unknown>;
+  const co = row.companies as Record<string, unknown> | null;
+  return NextResponse.json(rowToJob({ ...row, company: co?.name ?? '', company_logo: co?.logo ?? '' }), { status: 201 });
 }

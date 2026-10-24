@@ -21,6 +21,9 @@ create index if not exists idx_otp_expires on public.otp_verifications(expires_a
 -- Anon/authenticated users cannot read OTPs directly
 alter table public.otp_verifications enable row level security;
 
+-- Replace the policy if it already exists (idempotent on re-run)
+drop policy if exists "otp_no_public_access" on public.otp_verifications;
+
 create policy "otp_no_public_access"
   on public.otp_verifications
   for all

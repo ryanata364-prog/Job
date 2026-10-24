@@ -1,68 +1,118 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCurrentUser } from '@/lib/server/auth';
-import { createId, readDatabase, updateDatabase } from '@/lib/server/database';
+import { createRouteClient } from '@/lib/server/supabaseServer';
 import type { Application } from '@/lib/types';
 
 export const runtime = 'nodejs';
 
-export async function GET(request: NextRequest) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ detail: 'Authentication required.' }, { status: 401 });
-
-  const jobId = request.nextUrl.searchParams.get('job');
-  const database = await readDatabase();
-  let applications = database.applications;
-  if (user.role === 'seeker') applications = applications.filter((application) => application.seekerId === user.id);
-  if (jobId) applications = applications.filter((application) => application.jobId === jobId);
-  return NextResponse.json(applications.sort((a, b) => b.appliedAt.localeCompare(a.appliedAt)));
+function rowToApplication(row: Record<string, unknown>): Application {
+  return {
+    id:           String(row.id ?? ''),
+    jobId:        String(row.job_id ?? ''),
+    jobTitle:     String(row.job_title ?? row.jobTitle ?? ''),
+    company:      String(row.company ?? ''),
+    companyLogo:  String(row.company_logo ?? row.companyLogo ?? ''),
+    seekerId:     String(row.seeker_id ?? ''),
+    seekerName:   String(row.seeker_name ?? row.seekerName ?? ''),
+    seekerEmail:  String(row.seeker_email ?? row.seekerEmail ?? ''),
+    status:       (row.status as Application['status']) ?? 'Applied',
+    coverLetter:  String(row.cover_letter ?? row.coverLetter ?? ''),
+    portfolioUrl: String(row.portfolio_url ?? row.portfolioUrl ?? ''),
+    linkedinUrl:  String(row.linkedin_url ?? row.linkedinUrl ?? ''),
+    appliedAt:    String(row.applied_at ?? row.appliedAt ?? ''),
+    updatedAt:    String(row.updated_at ?? row.updatedAt ?? ''),
+  };
 }
 
-type ApplicationBody = {
-  job?: string;
-  coverLetter?: string;
-  portfolioUrl?: string;
-  linkedinUrl?: string;
-};
+export async function GET(request: NextRequest) {
+  const supabase = await createRouteClient();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    return NextResponse.json({ detail: 'Authentication required.' }, { status: 401 });
+  }
+
+  const jobId = request.nextUrl.searchParams.get('job');
+
+  // Use the joined view that includes job title, company, seeker info
+  let query = supabase.from('applications_full').select('*');
+
+  // Seekers only see their own applications
+  const { data: profile } = await supabase
+    .from('profiles').select('role').eq('id', user.id).single();
+  if (profile?.role === 'seeker') {
+    query = query.eq('seeker_id', user.id);
+  }
+  if (jobId) {
+    query = query.eq('job_id', jobId);
+  }
+
+  const { data, error } = await query.order('applied_at', { ascending: false });
+
+  if (error) {
+    return NextResponse.json({ detail: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json((data ?? []).map(r => rowToApplication(r as Record<string, unknown>)));
+}
 
 export async function POST(request: Request) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ detail: 'Please sign in before applying.' }, { status: 401 });
-  if (user.role !== 'seeker') return NextResponse.json({ detail: 'Only job seekers can apply to jobs.' }, { status: 403 });
+  const supabase = await createRouteClient();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-  const body = (await request.json().catch(() => ({}))) as ApplicationBody;
-  if (!body.job) return NextResponse.json({ job: 'Select a job to apply for.' }, { status: 400 });
-
-  const result = await updateDatabase((database) => {
-    const job = database.jobs.find((item) => item.id === body.job && item.status === 'Active');
-    if (!job) return { error: 'not-found' } as const;
-    if (database.applications.some((application) => application.jobId === job.id && application.seekerId === user.id)) {
-      return { error: 'duplicate' } as const;
-    }
-    const now = new Date().toISOString();
-    const application: Application = {
-      id: createId('a'),
-      jobId: job.id,
-      jobTitle: job.title,
-      company: job.company,
-      companyLogo: job.companyLogo,
-      seekerId: user.id,
-      seekerName: user.name,
-      seekerEmail: user.email,
-      appliedAt: now,
-      updatedAt: now,
-      status: 'Applied',
-      coverLetter: body.coverLetter?.trim() || '',
-      portfolioUrl: body.portfolioUrl?.trim() || '',
-      linkedinUrl: body.linkedinUrl?.trim() || '',
-    };
-    database.applications.push(application);
-    job.applications += 1;
-    return { application } as const;
-  });
-
-  if ('error' in result) {
-    const message = result.error === 'duplicate' ? 'You have already applied for this job.' : 'The job is no longer available.';
-    return NextResponse.json({ detail: message }, { status: result.error === 'duplicate' ? 409 : 404 });
+  if (authError || !user) {
+    return NextResponse.json({ detail: 'Please sign in before applying.' }, { status: 401 });
   }
-  return NextResponse.json(result.application, { status: 201 });
+
+  const { data: profile } = await supabase
+    .from('profiles').select('role').eq('id', user.id).single();
+  if (profile?.role !== 'seeker') {
+    return NextResponse.json({ detail: 'Only job seekers can apply to jobs.' }, { status: 403 });
+  }
+
+  const body = (await request.json().catch(() => ({}))) as {
+    job?: string; coverLetter?: string; portfolioUrl?: string; linkedinUrl?: string;
+  };
+  if (!body.job) {
+    return NextResponse.json({ job: 'Select a job to apply for.' }, { status: 400 });
+  }
+
+  const { data: job } = await supabase
+    .from('jobs').select('id').eq('id', body.job).eq('status', 'Active').single();
+  if (!job) {
+    return NextResponse.json({ detail: 'The job is no longer available.' }, { status: 404 });
+  }
+
+  const { data, error } = await supabase
+    .from('applications')
+    .insert({
+      job_id:       body.job,
+      seeker_id:    user.id,
+      cover_letter: body.coverLetter?.trim() ?? '',
+      portfolio_url: body.portfolioUrl?.trim() ?? '',
+      linkedin_url: body.linkedinUrl?.trim() ?? '',
+      status:       'Applied',
+    })
+    .select('*, jobs(title, companies(name, logo)), profiles(name)')
+    .single();
+
+  if (error) {
+    if (error.code === '23505') {
+      return NextResponse.json({ detail: 'You have already applied for this job.' }, { status: 409 });
+    }
+    return NextResponse.json({ detail: error.message }, { status: 500 });
+  }
+
+  const row = data as Record<string, unknown>;
+  const jobData = row.jobs as Record<string, unknown> | null;
+  const companyData = jobData?.companies as Record<string, unknown> | null;
+  const seekerProfile = row.profiles as Record<string, unknown> | null;
+
+  return NextResponse.json(rowToApplication({
+    ...row,
+    job_title:    jobData?.title ?? '',
+    company:      companyData?.name ?? '',
+    company_logo: companyData?.logo ?? '',
+    seeker_name:  seekerProfile?.name ?? '',
+    seeker_email: user.email ?? '',
+  }), { status: 201 });
 }

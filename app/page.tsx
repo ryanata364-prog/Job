@@ -4,8 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Search, MapPin, ArrowRight, TrendingUp, ChevronRight } from 'lucide-react';
 import Navbar from '@/components/layout/Navbar';
-
-import { getCompanies, getJobs } from '@/lib/api';
+import { supabase } from '@/lib/supabase';
 import type { Company, Job } from '@/lib/types';
 
 type HomeStats = {
@@ -91,29 +90,127 @@ export default function HomePage() {
     hiresMade: 0,
   });
 
+  // ── Helpers ────────────────────────────────────────────────────
+  const loadJobs = async () => {
+    const { data } = await supabase
+      .from('jobs_with_company')
+      .select('*')
+      .eq('status', 'Active')
+      .order('posted_at', { ascending: false });
+    if (!data) return;
+    const mapped: Job[] = (data as Record<string, unknown>[]).map(r => ({
+      id:               String(r.id ?? ''),
+      companyId:        String(r.company_id ?? ''),
+      company:          String(r.company ?? ''),
+      companyLogo:      String(r.company_logo ?? ''),
+      title:            String(r.title ?? ''),
+      location:         String(r.location ?? ''),
+      salary:           String(r.salary ?? ''),
+      type:             (r.type as Job['type']) ?? 'Full-time',
+      workplaceType:    (r.workplace_type as Job['workplaceType']) ?? 'On-site',
+      experience:       String(r.experience ?? ''),
+      category:         String(r.category ?? ''),
+      description:      String(r.description ?? ''),
+      responsibilities: Array.isArray(r.responsibilities) ? r.responsibilities as string[] : [],
+      requirements:     Array.isArray(r.requirements)     ? r.requirements as string[]     : [],
+      qualifications:   Array.isArray(r.qualifications)   ? r.qualifications as string[]   : [],
+      benefits:         Array.isArray(r.benefits)         ? r.benefits as string[]         : [],
+      skills:           Array.isArray(r.skills)           ? r.skills as string[]           : [],
+      vacancies:        Number(r.vacancies ?? 1),
+      deadline:         String(r.deadline ?? ''),
+      postedAt:         String(r.posted_at ?? ''),
+      status:           (r.status as Job['status']) ?? 'Active',
+      views:            Number(r.views ?? 0),
+      applications:     Number(r.application_count ?? 0),
+    }));
+    setJobs(mapped);
+    setStats(s => ({ ...s, activeJobs: mapped.length }));
+  };
+
+  const loadCompanies = async () => {
+    const { data } = await supabase
+      .from('companies')
+      .select('*, jobs(id, status)')
+      .order('name');
+    if (!data) return;
+    const mapped: Company[] = (data as Record<string, unknown>[]).map(r => {
+      const jobRows = Array.isArray(r.jobs) ? (r.jobs as Array<{ status: string }>) : [];
+      return {
+        id:          String(r.id ?? ''),
+        name:        String(r.name ?? ''),
+        logo:        String(r.logo ?? '🏢'),
+        industry:    String(r.industry ?? ''),
+        location:    String(r.location ?? ''),
+        size:        String(r.size ?? ''),
+        website:     String(r.website ?? ''),
+        description: String(r.description ?? ''),
+        benefits:    Array.isArray(r.benefits) ? r.benefits as string[] : [],
+        founded:     String(r.founded ?? ''),
+        jobCount:    jobRows.filter(j => j.status === 'Active').length,
+      };
+    });
+    setCompanies(mapped);
+    setStats(s => ({ ...s, companies: mapped.length }));
+  };
+
+  const loadStats = async () => {
+    const res = await fetch('/api/stats');
+    if (!res.ok) return;
+    const data = await res.json() as Record<string, number>;
+    setStats({
+      activeJobs:  data.active_jobs  ?? 0,
+      companies:   data.companies    ?? 0,
+      jobSeekers:  data.job_seekers  ?? 0,
+      hiresMade:   data.hires_made   ?? 0,
+    });
+  };
+
   useEffect(() => {
-    getJobs().then((loadedJobs) => {
-      setJobs(loadedJobs);
-      setStats((current) => ({ ...current, activeJobs: loadedJobs.filter((job) => job.status === 'Active').length }));
-    }).catch(() => undefined);
+    // Initial load
+    void loadJobs();
+    void loadCompanies();
+    void loadStats();
 
-    getCompanies().then((loadedCompanies) => {
-      setCompanies(loadedCompanies);
-      setStats((current) => ({ ...current, companies: loadedCompanies.length }));
-    }).catch(() => undefined);
-
-    fetch('/api/stats')
-      .then((response) => response.ok ? response.json() : null)
-      .then((data) => {
-        if (!data) return;
-        setStats({
-          activeJobs: Number(data.active_jobs ?? 0),
-          companies: Number(data.companies ?? 0),
-          jobSeekers: Number(data.job_seekers ?? 0),
-          hiresMade: Number(data.hires_made ?? 0),
-        });
+    // Real-time: re-fetch when jobs table changes
+    const jobsChannel = supabase
+      .channel('home:jobs')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs' }, () => {
+        void loadJobs();
+        void loadStats();
       })
-      .catch(() => undefined);
+      .subscribe();
+
+    // Real-time: re-fetch when companies table changes
+    const companiesChannel = supabase
+      .channel('home:companies')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'companies' }, () => {
+        void loadCompanies();
+        void loadStats();
+      })
+      .subscribe();
+
+    // Real-time: update hires count when applications change
+    const applicationsChannel = supabase
+      .channel('home:applications')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'applications' }, () => {
+        void loadStats();
+      })
+      .subscribe();
+
+    // Real-time: update job seekers count when profiles change
+    const profilesChannel = supabase
+      .channel('home:profiles')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
+        void loadStats();
+      })
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(jobsChannel);
+      void supabase.removeChannel(companiesChannel);
+      void supabase.removeChannel(applicationsChannel);
+      void supabase.removeChannel(profilesChannel);
+    };
   }, []);
 
   const handleSearch = () => {

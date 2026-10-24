@@ -3,7 +3,7 @@ import { Suspense, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
-  CheckCircle, Clock, Mail, RefreshCw,
+  CheckCircle, RefreshCw,
   AlertCircle, ShieldCheck, ArrowLeft,
 } from 'lucide-react';
 
@@ -11,6 +11,7 @@ function VerifyOTPContent() {
   const router       = useRouter();
   const searchParams = useSearchParams();
   const email        = searchParams.get('email') ?? '';
+  const next         = searchParams.get('next') ?? '';  // 'login' = came from login flow
 
   const [otp, setOtp]           = useState(['', '', '', '', '', '']);
   const [error, setError]       = useState('');
@@ -78,6 +79,10 @@ function VerifyOTPContent() {
       }
 
       setVerified(true);
+      // If we came from the login flow, redirect automatically after a moment
+      if (next === 'login') {
+        setTimeout(() => router.push('/'), 1500);
+      }
     } catch {
       setError('Network error. Please check your connection and try again.');
     } finally {
@@ -125,20 +130,19 @@ function VerifyOTPContent() {
               {[
                 { label: 'Registered', done: true },
                 { label: 'Email Verified', done: true },
-                { label: 'Admin Approval', done: false, active: true },
-                { label: 'Login', done: false },
+                { label: 'Login', done: false, active: true },
               ].map((step, i, arr) => (
                 <div key={step.label} className="flex items-center">
                   <div className="flex flex-col items-center">
                     <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
                       step.done ? 'bg-green-500 text-white' :
-                      step.active ? 'bg-amber-500 text-white' :
+                      step.active ? 'bg-blue-500 text-white' :
                       'bg-gray-200 text-gray-400'
                     }`}>
                       {step.done ? '✓' : i + 1}
                     </div>
                     <span className={`text-xs mt-1 whitespace-nowrap ${
-                      step.done ? 'text-green-600' : step.active ? 'text-amber-600' : 'text-gray-400'
+                      step.done ? 'text-green-600' : step.active ? 'text-blue-600' : 'text-gray-400'
                     }`}>{step.label}</span>
                   </div>
                   {i < arr.length - 1 && <div className="w-6 h-px bg-gray-300 mx-1 mb-4" />}
@@ -149,41 +153,26 @@ function VerifyOTPContent() {
             <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <CheckCircle className="w-9 h-9 text-green-500" />
             </div>
-            <h2 className="text-xl font-bold text-gray-900 mb-2">Email Verified!</h2>
+            <h2 className="text-xl font-bold text-gray-900 mb-2">
+              {next === 'login' ? 'Identity Verified!' : 'Email Verified!'}
+            </h2>
             <p className="text-gray-500 text-sm mb-6">
-              Your email has been verified successfully. Your account is now
-              <strong className="text-amber-600"> pending Admin approval</strong>.
-              You will be notified once approved.
+              {next === 'login'
+                ? 'Your identity has been confirmed. Redirecting you now…'
+                : 'Your email has been verified successfully. You can now sign in to your account.'}
             </p>
 
-            <div className="space-y-3 mb-6 text-left">
-              <div className="flex items-start gap-3 p-3 bg-amber-50 border border-amber-100 rounded-xl">
-                <Clock className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-sm font-medium text-amber-800">Awaiting Admin Approval</p>
-                  <p className="text-xs text-amber-600 mt-0.5">
-                    The admin will review your account. This usually takes 1–2 business days.
-                  </p>
-                </div>
+            {next === 'login' ? (
+              <div className="flex items-center justify-center gap-2 py-3 text-blue-600 text-sm font-medium">
+                <span className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                Redirecting…
               </div>
-              <div className="flex items-start gap-3 p-3 bg-blue-50 border border-blue-100 rounded-xl">
-                <Mail className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-sm font-medium text-blue-800">Email Notification</p>
-                  <p className="text-xs text-blue-600 mt-0.5">
-                    You&apos;ll receive an email when your account is approved or rejected.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <Link href="/login"
-              className="block w-full py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition-colors">
-              Back to Sign In
-            </Link>
-            <p className="mt-3 text-xs text-gray-400">
-              Questions? <a href="mailto:admin@hireflow.com" className="text-blue-600 hover:underline">Contact admin</a>
-            </p>
+            ) : (
+              <Link href="/login"
+                className="block w-full py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition-colors">
+                Continue to Sign In
+              </Link>
+            )}
           </div>
         </div>
       </div>
